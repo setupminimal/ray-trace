@@ -1,0 +1,16 @@
+[package]
+name = "ray-trace"
+version = "0.1.0"
+authors = ["Daroc Alden <setupminimal@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+impl_ops = "0.1.1"
+rand = "0.7.2"
+clap = "2.33.0"
+rayon = "1.3.0"
+
+[profile.release]
+debug = true
