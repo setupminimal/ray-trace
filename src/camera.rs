@@ -1,18 +1,50 @@
-use crate::vec::*;
-use crate::shape::*;
 use crate::sample::*;
+use crate::shape::*;
+use crate::vec::*;
 
 use std::f32::consts::PI;
+
+fn tfog(ray: Ray, t: Float) -> Float {
+    ((ray.origin.x + ray.direction.x*t).sin() *
+     (ray.origin.z + ray.direction.z*t).sin() /
+     (ray.origin.y + ray.direction.y*t)
+    ).powi(2)
+}
+
+fn fog(point: Vec3) -> Float {
+    (point.x.sin() * point.z.sin() / point.y).powi(2)
+}
+
+fn dfog(point: Vec3, dir: Vec3) -> Float {
+    let ev = (point.x.sin() * point.z.sin() / point.y);
+    let grad = Vec3::new(
+        2 * ev * point.x.cos(),
+        -2 * ev / point.y.powi(2),
+        2 * ev * point.z.cos()
+    );
+
+    grad % dir
+}
 
 fn color(ray: Ray, scene: &HitableGroup) -> Vec3 {
     let white = Vec3::new(1.0, 1.0, 1.0);
     let blue = Vec3::new(0.5, 0.7, 1.0);
+    let black = Vec3::new(0.0, 0.0, 0.0);
+
+    let bbox = AABB {
+        min: Vec3::new(-1.0, -1.0, -1.0),
+        max: Vec3::new(1.0, 7.0, 1.0),
+    };
+
+    if !bbox.hit(&ray, 0.001, 1_000_000.0).is_none() {
+        return black;
+    }
 
     let mut color = Vec3::new(1.0, 1.0, 1.0);
     let mut current_ray = ray;
     let mut iterations = 0;
 
-    while iterations < 100 && color.norm() > 0.02 {
+    while iterations < 10 && color.norm() > 0.02 {
         let hit = scene.hit(&current_ray, 0.001, 1_000_000.0);
         match hit {
             None => {
@@ -20,16 +52,15 @@ fn color(ray: Ray, scene: &HitableGroup) -> Vec3 {
                 let t = 0.5 * (direction.y + 1.0);
                 color *= (white * (1.0 - t)) + (blue * t);
                 break;
-            },
+            }
             Some(hit) => {
-                let scatter = hit.material.scatter(
-                    &current_ray, hit.point, hit.normal);
+                let scatter = hit.material.scatter(&current_ray, hit.point, hit.normal);
                 color *= scatter.attenuation;
                 iterations += 1;
                 match scatter.ray {
                     Some(r) => {
                         current_ray = r;
-                    },
+                    }
                     None => {
                         break;
                     }
@@ -55,8 +86,16 @@ pub struct Camera {
 }
 
 impl Camera {
-
-    pub fn new(lookfrom: Vec3, lookat: Vec3, vup: Vec3, nx: u16, ny: u16, vfov: Float, aperture: Float, samples: u16) -> Camera {
+    pub fn new(
+        lookfrom: Vec3,
+        lookat: Vec3,
+        vup: Vec3,
+        nx: u16,
+        ny: u16,
+        vfov: Float,
+        aperture: Float,
+        samples: u16,
+    ) -> Camera {
         let focus_dist = (&lookfrom - &lookat).norm();
 
         let w = (&lookfrom - &lookat).to_unit();
@@ -73,10 +112,10 @@ impl Camera {
             lens_radius: aperture / 2.0,
             nx: nx as Float,
             ny: ny as Float,
-            lower_left: &lookfrom -
-                (&u * half_width * focus_dist) -
-                (&v * half_height * focus_dist) -
-                (&w * focus_dist),
+            lower_left: &lookfrom
+                - (&u * half_width * focus_dist)
+                - (&v * half_height * focus_dist)
+                - (&w * focus_dist),
             horizontal: 2.0 * half_width * focus_dist * &u,
             vertical: 2.0 * half_height * focus_dist * &v,
             origin: lookfrom,
@@ -92,14 +131,14 @@ impl Camera {
             let offset = &self.u * rd.x + &self.v * rd.y;
             let u = (x as Float + random()) / self.nx;
             let v = (y as Float + random()) / self.ny;
-            let ray = Ray {
-                origin: &self.origin + &offset,
-                direction: &self.lower_left +
-                    (u * &self.horizontal) +
-                    (v * &self.vertical) +
-                    self.origin.negate() +
-                    offset.negate(),
-            };
+            let ray = Ray::new(
+                &self.origin + &offset,
+                &self.lower_left
+                    + (u * &self.horizontal)
+                    + (v * &self.vertical)
+                    + self.origin.negate()
+                    + offset.negate(),
+            );
 
             let val = color(ray, world);
             acc_color += val;

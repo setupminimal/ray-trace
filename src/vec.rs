@@ -1,15 +1,70 @@
 use std::ops;
+use Direction::*;
 
 pub type Float = f32;
 
 #[derive(Debug, Clone)]
 pub struct Vec3 {
-    pub x : Float,
-    pub y : Float,
-    pub z : Float,
+    pub x: Float,
+    pub y: Float,
+    pub z: Float,
+}
+
+#[derive(Copy, Clone)]
+pub enum Direction {
+    X,
+    Y,
+    Z,
 }
 
 impl Vec3 {
+
+    pub const fn cardinal_directions() -> [Vec3; 3] {
+        [
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        ]
+    }
+
+    pub fn elem_min(&self, other: &Vec3) -> Vec3 {
+        Vec3::new(
+            if self.x < other.x { self.x } else { other.x },
+            if self.y < other.y { self.y } else { other.y },
+            if self.z < other.z { self.z } else { other.z },
+        )
+    }
+
+    pub fn elem_max(&self, other: &Vec3) -> Vec3 {
+        Vec3::new(
+            if self.x > other.x { self.x } else { other.x },
+            if self.y > other.y { self.y } else { other.y },
+            if self.z > other.z { self.z } else { other.z },
+        )
+    }
+
+    pub fn get(&self, dir: Direction) -> Float {
+        match dir {
+            X => self.x,
+            Y => self.y,
+            Z => self.z,
+        }
+    }
+
+    pub fn longest_dimension(&self) -> Direction {
+        if self.x > self.y {
+            if self.x > self.z {
+                X
+            } else {
+                Z
+            }
+        } else if self.y > self.z {
+            Y
+        } else {
+            Z
+        }
+    }
+
     pub fn norm(&self) -> Float {
         (self % self).sqrt()
     }
@@ -38,12 +93,8 @@ impl Vec3 {
         }
     }
 
-    pub fn new(a: Float, b: Float, c: Float) -> Vec3 {
-        Vec3 {
-            x: a,
-            y: b,
-            z: c,
-        }
+    pub const fn new(a: Float, b: Float, c: Float) -> Vec3 {
+        Vec3 { x: a, y: b, z: c }
     }
 
     pub fn cross(&self, other: &Vec3) -> Vec3 {
@@ -55,81 +106,476 @@ impl Vec3 {
     }
 }
 
-impl_op_ex_commutative!(* |a: &Vec3, b: &Float| -> Vec3 {
-    Vec3 {
-        x: a.x * b,
-        y: a.y * b,
-        z: a.z * b,
+impl<'a, 'b> ops::Mul<&'a Float> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: &Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
 
-impl_op_ex!(/ |a: &Vec3, b: &Float| -> Vec3 {
-    Vec3 {
-        x: a.x / b,
-        y: a.y / b,
-        z: a.z / b,
+impl<'a> ops::Mul<Float> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
 
-impl_op_ex!(* |a: &Vec3, b: &Vec3| -> Vec3 {
-    Vec3 {
-        x: a.x * b.x,
-        y: a.y * b.y,
-        z: a.z * b.z,
+impl<'a> ops::Mul<&'a Float> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: &Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
 
-impl_op_ex!(/ |a: &Vec3, b: &Vec3| -> Vec3 {
-    Vec3 {
-        x: a.x / b.x,
-        y: a.y / b.y,
-        z: a.z / b.z,
+impl ops::Mul<Float> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
 
-impl_op_ex!(+ |a: &Vec3, b: &Vec3| -> Vec3 {
-    Vec3 {
-        x: a.x + b.x,
-        y: a.y + b.y,
-        z: a.z + b.z,
+impl<'a, 'b> ops::Mul<&'a Vec3> for &'b Float {
+    type Output = Vec3;
+
+    fn mul(self, a: &Vec3) -> Self::Output {
+        let b = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
+impl<'a> ops::Mul<Vec3> for &'a Float {
+    type Output = Vec3;
 
-impl_op_ex!(- |a: &Vec3, b: &Vec3| -> Vec3 {
-    Vec3 {
-        x: a.x - b.x,
-        y: a.y - b.y,
-        z: a.z - b.z,
+    fn mul(self, a: Vec3) -> Self::Output {
+        let b = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
     }
-});
+}
 
-impl_op_ex!(% |a: &Vec3, b: &Vec3| -> Float {
-    a.x * b.x + a.y * b.y + a.z * b.z
-});
+impl<'a> ops::Mul<&'a Vec3> for Float {
+    type Output = Vec3;
 
-impl_op!(*= |a: &mut Vec3, b: &Vec3| {
-    *a = &(*a) * b;
-});
+    fn mul(self, a: &Vec3) -> Self::Output {
+        let b = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
+    }
+}
 
-impl_op!(*= |a: &mut Vec3, b: Vec3| {
-    *a = &(*a) * b;
-});
+impl ops::Mul<Vec3> for Float {
+    type Output = Vec3;
 
-impl_op!(+= |a: &mut Vec3, b: Vec3| {
-    *a = &(*a) + b;
-});
+    fn mul(self, a: Vec3) -> Self::Output {
+        let b = self;
+        Vec3 {
+            x: a.x * b,
+            y: a.y * b,
+            z: a.z * b,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Div<&'a Float> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: &Float) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b,
+            y: a.y / b,
+            z: a.z / b,
+        }
+    }
+}
+
+impl<'a> ops::Div<Float> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x / b,
+            y: a.y / b,
+            z: a.z / b,
+        }
+    }
+}
+
+impl<'a> ops::Div<&'a Float> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: &Float) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b,
+            y: a.y / b,
+            z: a.z / b,
+        }
+    }
+}
+
+impl ops::Div<Float> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: Float) -> Self::Output {
+        let a = self;
+        Vec3 {
+            x: a.x / b,
+            y: a.y / b,
+            z: a.z / b,
+        }
+    }
+}
+
+impl ops::Div<&Vec3> for Float {
+    type Output = Vec3;
+
+    fn div(self, a: &Vec3) -> Self::Output {
+        let b = self;
+        Vec3 {
+            x: a.x / b,
+            y: a.y / b,
+            z: a.z / b,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Mul<&'a Vec3> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x * b.x,
+            y: a.y * b.y,
+            z: a.z * b.z,
+        }
+    }
+}
+
+impl<'a> ops::Mul<Vec3> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x * b.x,
+            y: a.y * b.y,
+            z: a.z * b.z,
+        }
+    }
+}
+
+impl<'a> ops::Mul<&'a Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x * b.x,
+            y: a.y * b.y,
+            z: a.z * b.z,
+        }
+    }
+}
+
+impl ops::Mul<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x * b.x,
+            y: a.y * b.y,
+            z: a.z * b.z,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Div<&'a Vec3> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b.x,
+            y: a.y / b.y,
+            z: a.z / b.z,
+        }
+    }
+}
+
+impl<'a> ops::Div<Vec3> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b.x,
+            y: a.y / b.y,
+            z: a.z / b.z,
+        }
+    }
+}
+
+impl<'a> ops::Div<&'a Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b.x,
+            y: a.y / b.y,
+            z: a.z / b.z,
+        }
+    }
+}
+
+impl ops::Div<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x / b.x,
+            y: a.y / b.y,
+            z: a.z / b.z,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Add<&'a Vec3> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn add(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x + b.x,
+            y: a.y + b.y,
+            z: a.z + b.z,
+        }
+    }
+}
+
+impl<'a> ops::Add<Vec3> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn add(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x + b.x,
+            y: a.y + b.y,
+            z: a.z + b.z,
+        }
+    }
+}
+
+impl<'a> ops::Add<&'a Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x + b.x,
+            y: a.y + b.y,
+            z: a.z + b.z,
+        }
+    }
+}
+
+impl ops::Add<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x + b.x,
+            y: a.y + b.y,
+            z: a.z + b.z,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Sub<&'a Vec3> for &'b Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x - b.x,
+            y: a.y - b.y,
+            z: a.z - b.z,
+        }
+    }
+}
+
+impl<'a> ops::Sub<Vec3> for &'a Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x - b.x,
+            y: a.y - b.y,
+            z: a.z - b.z,
+        }
+    }
+}
+
+impl<'a> ops::Sub<&'a Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x - b.x,
+            y: a.y - b.y,
+            z: a.z - b.z,
+        }
+    }
+}
+
+impl ops::Sub<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        Vec3 {
+            x: a.x - b.x,
+            y: a.y - b.y,
+            z: a.z - b.z,
+        }
+    }
+}
+
+impl<'a, 'b> ops::Rem<&'a Vec3> for &'b Vec3 {
+    type Output = Float;
+
+    fn rem(self, b: &Vec3) -> Self::Output {
+        let a = self;
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
+}
+
+impl<'a> ops::Rem<Vec3> for &'a Vec3 {
+    type Output = Float;
+
+    fn rem(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
+}
+
+impl<'a> ops::Rem<&'a Vec3> for Vec3 {
+    type Output = Float;
+
+    fn rem(self, b: &Vec3) -> Self::Output {
+        let a = self;
+
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
+}
+
+impl ops::Rem<Vec3> for Vec3 {
+    type Output = Float;
+
+    fn rem(self, b: Vec3) -> Self::Output {
+        let a = self;
+
+        a.x * b.x + a.y * b.y + a.z * b.z
+    }
+}
+
+impl<'a> ops::MulAssign<&'a Vec3> for Vec3 {
+    fn mul_assign(&mut self, b: &Vec3) {
+        *self = &(*self) * b;
+    }
+}
+
+impl ops::MulAssign<Vec3> for Vec3 {
+    fn mul_assign(&mut self, b: Vec3) {
+        *self = &(*self) * b;
+    }
+}
+
+impl ops::AddAssign<Vec3> for Vec3 {
+    fn add_assign(&mut self, b: Vec3) {
+        *self = &(*self) + b;
+    }
+}
 
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
+    pub dir_inv: Vec3,
 }
 
 impl Ray {
     pub fn point_at(&self, x: Float) -> Vec3 {
         &self.origin + (&self.direction * x)
     }
-}
 
+    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
+        Ray {
+            origin,
+            dir_inv: 1.0 / &direction,
+            direction,
+        }
+    }
+}
 
 pub fn reflect(v: &Vec3, normal: &Vec3) -> Vec3 {
     v - 2.0 * (v % normal) * normal

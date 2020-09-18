@@ -1,13 +1,22 @@
-use crate::vec::*;
 use crate::sample::*;
+use crate::vec::*;
 
 use Material::*;
 
+const INVIS: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+pub const INVIS_MAT: Material = Invis;
+const NO_SCATTER: ScatterRecord = ScatterRecord {
+    attenuation: &INVIS,
+    ray: None,
+};
+
+#[derive(Clone)]
 pub enum Material {
     Lambertian(Vec3),
     Metal(Vec3, Float),
     Dielectric(Vec3, Float),
     NoScatter(Vec3),
+    Invis,
 }
 
 pub struct ScatterRecord<'a> {
@@ -16,58 +25,71 @@ pub struct ScatterRecord<'a> {
 }
 
 impl Material {
-    pub fn scatter(&self, ray: &Ray, point: Vec3, normal: Vec3) -> ScatterRecord {
-        match self {
-            Lambertian(albedo) => {
-                let target = normal + sample_sphere();
-                ScatterRecord { attenuation: albedo,
-                                ray: Some(Ray { origin: point,
-                                                direction: target }) }
-            },
-            Metal(albedo, fuzz) => {
-                let reflected = reflect(&ray.direction.to_unit(), &normal);
-                let scattered = Ray { origin: point,
-                                      direction: reflected + fuzz * sample_sphere() };
-                if &scattered.direction % normal > 0.0 {
-                    ScatterRecord { attenuation: albedo,
-                                    ray: Some(scattered) }
-                } else {
-                    ScatterRecord { attenuation: albedo,
-                                    ray: None }
+    pub fn scatter(&self, ray: &Ray, point: Vec3, normal: Option<Vec3>) -> ScatterRecord {
+        match normal {
+            None => NO_SCATTER,
+            Some(normal) => match self {
+                Lambertian(albedo) => {
+                    let target = normal + sample_sphere();
+                    ScatterRecord {
+                        attenuation: albedo,
+                        ray: Some(Ray::new(point, target)),
+                    }
                 }
-            },
-            Dielectric(attenuation, ref_idx) => {
-                let reflected = reflect(&ray.direction, &normal);
-                let dotdir = &ray.direction % &normal;
-                let invref_idx = 1.0 / ref_idx;
-                let (outward_normal, nint, cosine) =
-                    if dotdir > 0.0 {
-                        (normal.negate(),
-                         ref_idx,
-                         ref_idx * dotdir / ray.direction.norm())
+                Metal(albedo, fuzz) => {
+                    let reflected = reflect(&ray.direction.to_unit(), &normal);
+                    let scattered = Ray::new(point, reflected + fuzz * sample_sphere());
+                    if &scattered.direction % normal > 0.0 {
+                        ScatterRecord {
+                            attenuation: albedo,
+                            ray: Some(scattered),
+                        }
                     } else {
-                        (normal,
-                        &invref_idx,
-                        -dotdir / ray.direction.norm())
+                        ScatterRecord {
+                            attenuation: albedo,
+                            ray: None,
+                        }
+                    }
+                }
+                Dielectric(attenuation, ref_idx) => {
+                    let reflected = reflect(&ray.direction, &normal);
+                    let dotdir = &ray.direction % &normal;
+                    let invref_idx = 1.0 / ref_idx;
+                    let (outward_normal, nint, cosine) = if dotdir > 0.0 {
+                        (
+                            normal.negate(),
+                            ref_idx,
+                            ref_idx * dotdir / ray.direction.norm(),
+                        )
+                    } else {
+                        (normal, &invref_idx, -dotdir / ray.direction.norm())
                     };
 
-                let direction = match refract(&ray.direction, &outward_normal, *nint) {
-                    Some(refracted) => if random() < schlick(cosine, *ref_idx) { reflected } else { refracted },
-                    None => reflected
+                    let direction = match refract(&ray.direction, &outward_normal, *nint) {
+                        Some(refracted) => {
+                            if random() < schlick(cosine, *ref_idx) {
+                                reflected
+                            } else {
+                                refracted
+                            }
+                        }
+                        None => reflected,
+                    };
 
-                };
-
-                ScatterRecord {
-                    attenuation: &attenuation,
-                    ray: Some(Ray { origin: point, direction })
+                    ScatterRecord {
+                        attenuation: &attenuation,
+                        ray: Some(Ray::new(point, direction)),
+                    }
                 }
-            },
-            NoScatter(glow) => {
-                ScatterRecord {
+                NoScatter(glow) => ScatterRecord {
                     attenuation: &glow,
-                    ray: None
-                }
-            }
+                    ray: None,
+                },
+                Invis => ScatterRecord {
+                    attenuation: &INVIS,
+                    ray: None,
+                },
+            },
         }
     }
 }
