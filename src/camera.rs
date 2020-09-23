@@ -5,10 +5,9 @@ use crate::vec::*;
 use std::f32::consts::PI;
 
 fn tfog(ray: Ray, t: Float) -> Float {
-    ((ray.origin.x + ray.direction.x*t).sin() *
-     (ray.origin.z + ray.direction.z*t).sin() /
-     (ray.origin.y + ray.direction.y*t)
-    ).powi(2)
+    ((ray.origin.x + ray.direction.x * t).sin() * (ray.origin.z + ray.direction.z * t).sin()
+        / (ray.origin.y + ray.direction.y * t))
+        .powi(2)
 }
 
 fn fog(point: Vec3) -> Float {
@@ -18,9 +17,9 @@ fn fog(point: Vec3) -> Float {
 fn dfog(point: Vec3, dir: Vec3) -> Float {
     let ev = (point.x.sin() * point.z.sin() / point.y);
     let grad = Vec3::new(
-        2 * ev * point.x.cos(),
-        -2 * ev / point.y.powi(2),
-        2 * ev * point.z.cos()
+        2.0 * ev * point.x.cos(),
+        -2.0 * ev / point.y.powi(2),
+        2.0 * ev * point.z.cos(),
     );
 
     grad % dir
@@ -31,26 +30,19 @@ fn color(ray: Ray, scene: &HitableGroup) -> Vec3 {
     let blue = Vec3::new(0.5, 0.7, 1.0);
     let black = Vec3::new(0.0, 0.0, 0.0);
 
-    let bbox = AABB {
-        min: Vec3::new(-1.0, -1.0, -1.0),
-        max: Vec3::new(1.0, 7.0, 1.0),
-    };
-
-    if !bbox.hit(&ray, 0.001, 1_000_000.0).is_none() {
-        return black;
-    }
-
     let mut color = Vec3::new(1.0, 1.0, 1.0);
     let mut current_ray = ray;
     let mut iterations = 0;
 
-    while iterations < 10 && color.norm() > 0.02 {
+    while iterations < 100 && color.norm() > 0.02 {
         let hit = scene.hit(&current_ray, 0.001, 1_000_000.0);
         match hit {
             None => {
+                //panic!("Uncontained viewpoint!");
                 let direction = current_ray.direction.to_unit();
                 let t = 0.5 * (direction.y + 1.0);
                 color *= (white * (1.0 - t)) + (blue * t);
+                color *= black;
                 break;
             }
             Some(hit) => {
@@ -138,6 +130,7 @@ impl Camera {
                     + (v * &self.vertical)
                     + self.origin.negate()
                     + offset.negate(),
+                0.0,
             );
 
             let val = color(ray, world);

@@ -18,7 +18,6 @@ pub enum Direction {
 }
 
 impl Vec3 {
-
     pub const fn cardinal_directions() -> [Vec3; 3] {
         [
             Vec3::new(1.0, 0.0, 0.0),
@@ -561,6 +560,7 @@ pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
     pub dir_inv: Vec3,
+    pub acc_len: Float,
 }
 
 impl Ray {
@@ -568,11 +568,12 @@ impl Ray {
         &self.origin + (&self.direction * x)
     }
 
-    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
+    pub fn new(origin: Vec3, direction: Vec3, acc_len: Float) -> Ray {
         Ray {
             origin,
             dir_inv: 1.0 / &direction,
             direction,
+            acc_len,
         }
     }
 }

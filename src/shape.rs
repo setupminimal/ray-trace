@@ -282,9 +282,67 @@ impl<T: Boxable + std::clone::Clone> KDTree<T> {
     }
 }
 
+pub struct Cylinder {
+    pub radius: Float,
+    pub material: Material,
+}
+
+impl Hitable for Cylinder {
+    fn hit(&self, ray: &Ray, t_min: Float, t_max: Float) -> Option<HitRecord> {
+        let dir = &ray.direction * Vec3::new(0.0, 1.0, 1.0);
+        let orig = &ray.origin * Vec3::new(0.0, 1.0, 1.0);
+
+        // r^2 = ||orig + t * dir||^2
+        // r^2 = x[orig + t * dir]^2 + y[orig + t * dir]^2
+        // r^2 = (x[orig] + t x[dir])^2 + (y[orig] + t y[dir])^2
+        // r^2 = x[orig]^2 + 2 t x[dir] x[orig] + t^2 x[dir]^2 + y[orig]^2 + 2 t y[dir] y[orig] + t^2 y[dir]^2
+        // r^2 = ||orig||^2 + 2 t (dir . orig) + t^2 ||dir||^2
+        // t^2 ||dir||^2 + 2 t (dir . orig) + ||orig||^2 - r^2 = 0
+
+        let a = &dir % &dir;
+        let b = 2.0 * (&dir % &orig);
+        let c = &orig % &orig - (self.radius * self.radius);
+
+        let discriminant = (b * b) - (4.0 * a * c);
+
+        if discriminant < 0.0 {
+            return None;
+        }
+
+        let tmp = (-b - discriminant.sqrt()) / (2.0 * a);
+        let point = ray.point_at(tmp);
+        let normal = (&point - Vec3::new(point.x, 0.0, 0.0)).to_unit();
+
+        if tmp < t_max && tmp > t_min {
+            return Some(HitRecord {
+                point,
+                normal: Some(normal),
+                pos: tmp,
+                material: &self.material,
+            });
+        }
+
+        let tmp = (-b + discriminant.sqrt()) / (2.0 * a);
+        let point = ray.point_at(tmp);
+        let normal = (Vec3::new(point.x, 0.0, 0.0) - &point).to_unit();
+
+        if tmp < t_max && tmp > t_min {
+            return Some(HitRecord {
+                point,
+                normal: Some(normal),
+                pos: tmp,
+                material: &self.material,
+            });
+        }
+
+        None
+    }
+}
+
 pub struct HitableGroup {
     pub planes: Vec<Plane>,
     pub spheres: KDTree<Sphere>,
+    pub cylinders: Vec<Cylinder>,
 }
 
 impl Hitable for HitableGroup {
@@ -302,6 +360,17 @@ impl Hitable for HitableGroup {
         }
 
         for item in &self.planes {
+            let intersect = item.hit(ray, t_min, closest);
+            match intersect {
+                None => (),
+                Some(newhit) => {
+                    closest = newhit.pos;
+                    record = Some(newhit);
+                }
+            }
+        }
+
+        for item in &self.cylinders {
             let intersect = item.hit(ray, t_min, closest);
             match intersect {
                 None => (),
