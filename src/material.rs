@@ -30,8 +30,6 @@ pub struct ScatterRecord<'a> {
 
 impl Material {
     pub fn scatter(&self, ray: &Ray, point: Vec3, normal: Option<Vec3>) -> ScatterRecord {
-        let acc_len = ray.acc_len + (&point - &ray.origin).norm();
-
         match normal {
             None => NO_SCATTER,
             Some(normal) => match self {
@@ -39,19 +37,19 @@ impl Material {
                     let target = normal + sample_sphere();
                     ScatterRecord {
                         attenuation: albedo,
-                        ray: Some(Ray::new(point, target, acc_len)),
+                        ray: Some(Ray::new(point, target)),
                     }
                 }
                 BiasedLambertian(albedo) => {
                     let target = normal + sample_sphere() * 0.10;
                     ScatterRecord {
                         attenuation: albedo,
-                        ray: Some(Ray::new(point, target, acc_len)),
+                        ray: Some(Ray::new(point, target)),
                     }
                 }
                 Metal(albedo, fuzz) => {
                     let reflected = reflect(&ray.direction.to_unit(), &normal);
-                    let scattered = Ray::new(point, reflected + fuzz * sample_sphere(), acc_len);
+                    let scattered = Ray::new(point, reflected + fuzz * sample_sphere());
                     if &scattered.direction % normal > 0.0 {
                         ScatterRecord {
                             attenuation: albedo,
@@ -91,7 +89,7 @@ impl Material {
 
                     ScatterRecord {
                         attenuation: &attenuation,
-                        ray: Some(Ray::new(point, direction, acc_len)),
+                        ray: Some(Ray::new(point, direction)),
                     }
                 }
                 NoScatter(glow) => ScatterRecord {
@@ -102,19 +100,10 @@ impl Material {
                     attenuation: &INVIS,
                     ray: None,
                 },
-                Sun(t) => {
-                    if point.x < t - acc_len {
-                        ScatterRecord {
-                            attenuation: &SUN_COLOR,
-                            ray: None,
-                        }
-                    } else {
-                        ScatterRecord {
-                            attenuation: &INVIS,
-                            ray: Some(Ray::new(point, ray.direction.clone(), acc_len)),
-                        }
-                    }
-                }
+                Sun(t) => ScatterRecord {
+                    attenuation: &SUN_COLOR,
+                    ray: None,
+                },
             },
         }
     }

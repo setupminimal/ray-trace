@@ -1,11 +1,12 @@
-#![feature(iterator_fold_self)]
-
 extern crate clap;
 extern crate rand;
 
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
+use std::sync::Mutex;
+
+use linya::Progress;
 
 use rayon::prelude::*;
 
@@ -26,6 +27,7 @@ use crate::shape::*;
 mod camera;
 use crate::camera::*;
 
+#[allow(dead_code)]
 fn pipedream(t: Float) -> HitableGroup {
     let mut planes: Vec<Plane> = Vec::new();
     let mut cylinders: Vec<Cylinder> = Vec::new();
@@ -59,6 +61,7 @@ fn pipedream(t: Float) -> HitableGroup {
     }
 }
 
+#[allow(dead_code)]
 fn plain_scene() -> HitableGroup {
     let mut things: Vec<Sphere> = Vec::new();
     let mut planes: Vec<Plane> = Vec::new();
@@ -89,13 +92,7 @@ fn random_scene() -> HitableGroup {
     planes.push(Plane {
         origin: Vec3::new(0.0, 0.0, 0.0),
         normal: Vec3::new(0.0, 1.0, 0.0),
-        material: Lambertian(Vec3::new(0.5, 0.6, 0.75)),
-    });
-
-    planes.push(Plane {
-        origin: Vec3::new(0.0, 0.0, 100.0),
-        normal: Vec3::new(0.0, 0.0, -1.0),
-        material: NoScatter(Vec3::new(1.0, 1.0, 1.0)),
+        material: Lambertian(Vec3::new(0.70, 0.73, 0.75)),
     });
 
     things.push(Sphere {
@@ -107,7 +104,7 @@ fn random_scene() -> HitableGroup {
     things.push(Sphere {
         center: Vec3::new(-4.0, 1.0, 0.0),
         radius: 1.0,
-        material: Lambertian(Vec3::new(0.4, 0.2, 0.1)),
+        material: Lambertian(Vec3::new(0.6, 0.4, 0.1)),
     });
 
     things.push(Sphere {
@@ -168,7 +165,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Raytrace")
         .version("1.0")
         .author("Daroc Alden <setupminimal@gmail.com>")
-        .about("Simple single-file raytracer")
+        .about("A raytracer from scratch")
         .arg(
             Arg::with_name("samples")
                 .short("s")
@@ -181,7 +178,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("width")
                 .short("x")
                 .long("width")
-                .default_value("600")
+                .default_value("300")
                 .help("Width of generated image.")
                 .takes_value(true),
         )
@@ -189,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("height")
                 .short("y")
                 .long("height")
-                .default_value("400")
+                .default_value("200")
                 .help("Height of generated image.")
                 .takes_value(true),
         )
@@ -223,13 +220,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Use parallel code.")
                 .takes_value(true),
         )
-        .arg(
-            Arg::with_name("time")
-                .short("t")
-                .default_value("0.0")
-                .help("What time to render at for relativistic effects.")
-                .takes_value(true),
-        )
         .get_matches();
 
     let samples = matches.value_of("samples").unwrap().parse::<u16>()?;
@@ -239,19 +229,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fov = matches.value_of("fov").unwrap().parse::<Float>()?;
     let aperature = matches.value_of("aperature").unwrap().parse::<Float>()?;
     let parallel = matches.value_of("parallel").unwrap().parse::<bool>()?;
-    let time = matches.value_of("time").unwrap().parse::<Float>()?;
 
     let mut output = File::create(file)?;
     output.write_all(b"P3\n")?;
     output.write_all(format!("{} {}\n", nx, ny).as_bytes())?;
     output.write_all(b"255\n")?;
 
-    // Use times from 3620-6000
-
-    let lookfrom = Vec3::new(60.0 * 60.0, 0.0, 7.99 * 60.0);
-    let lookat = Vec3::new(45.0 * 60.0, 0.0, 0.0);
-    /*let lookfrom = Vec3::new(9.0, 2.0, 5.0);
-    let lookat = Vec3::new(2.0, 1.0, 5.0);*/
+    let lookfrom = Vec3::new(5.0, 2.0, 7.0);
+    let lookat = Vec3::new(0.0, 1.0, 0.0);
 
     let cam = Camera::new(
         lookfrom,
@@ -263,9 +248,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         aperature,
         samples,
     );
-    let world = pipedream(time);
+    let world = random_scene();
 
     let lines = (0..ny).collect::<Vec<_>>();
+
+    let progress = Mutex::new(Progress::new());
+    let bar = progress.lock().unwrap().bar(ny.into(), "Rendering");
 
     let process_line = |j| {
         let rj = ny - 1 - j;
@@ -274,12 +262,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let pix = cam.point(i, rj, &world).as_ppm();
             v.push(pix.as_bytes().to_vec());
         }
+        progress.lock().unwrap().inc_and_draw(&bar, 1);
         v
     };
 
     for res in if parallel {
         lines.par_iter().map(process_line).collect::<Vec<_>>()
-    //lines.iter().map(process_line).collect::<Vec<_>>()
     } else {
         lines.iter().map(process_line).collect::<Vec<_>>()
     } {

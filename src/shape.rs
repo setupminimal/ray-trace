@@ -22,7 +22,7 @@ impl<T: Boxable> Boxable for Vec<T> {
     fn get_bbox(&self) -> AABB {
         self.iter()
             .map(|i| i.get_bbox())
-            .fold_first(|a, b| a.absorb(&b))
+            .reduce(|a, b| a.absorb(&b))
             .unwrap() // Don't call w/ empty vectors
     }
 }

@@ -15,7 +15,7 @@ fn fog(point: Vec3) -> Float {
 }
 
 fn dfog(point: Vec3, dir: Vec3) -> Float {
-    let ev = (point.x.sin() * point.z.sin() / point.y);
+    let ev = point.x.sin() * point.z.sin() / point.y;
     let grad = Vec3::new(
         2.0 * ev * point.x.cos(),
         -2.0 * ev / point.y.powi(2),
@@ -38,11 +38,9 @@ fn color(ray: Ray, scene: &HitableGroup) -> Vec3 {
         let hit = scene.hit(&current_ray, 0.001, 1_000_000.0);
         match hit {
             None => {
-                //panic!("Uncontained viewpoint!");
                 let direction = current_ray.direction.to_unit();
                 let t = 0.5 * (direction.y + 1.0);
                 color *= (white * (1.0 - t)) + (blue * t);
-                color *= black;
                 break;
             }
             Some(hit) => {
@@ -130,7 +128,6 @@ impl Camera {
                     + (v * &self.vertical)
                     + self.origin.negate()
                     + offset.negate(),
-                0.0,
             );
 
             let val = color(ray, world);
@@ -140,3 +137,7 @@ impl Camera {
         acc_color / (self.samples as Float)
     }
 }
+
+// TODO add tests:
+// - Image render with no light sources (incl backround light)
+//   should be completely dark
