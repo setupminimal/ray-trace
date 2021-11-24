@@ -19,7 +19,7 @@ pub enum Material {
     Dielectric(Vec3, Float),
     NoScatter(Vec3),
     Invis,
-    Sun(f32),
+    Sun,
     BiasedLambertian(Vec3),
 }
 
@@ -100,7 +100,7 @@ impl Material {
                     attenuation: &INVIS,
                     ray: None,
                 },
-                Sun(t) => ScatterRecord {
+                Sun => ScatterRecord {
                     attenuation: &SUN_COLOR,
                     ray: None,
                 },

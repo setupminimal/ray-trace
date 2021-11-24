@@ -1,3 +1,5 @@
+use rand::random;
+
 use std::ops;
 use Direction::*;
 
@@ -24,6 +26,10 @@ impl Vec3 {
             Vec3::new(0.0, 1.0, 0.0),
             Vec3::new(0.0, 0.0, 1.0),
         ]
+    }
+
+    pub fn random() -> Vec3 {
+        Vec3::new(random(), random(), random())
     }
 
     pub fn elem_min(&self, other: &Vec3) -> Vec3 {

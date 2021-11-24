@@ -85,9 +85,8 @@ impl Camera {
         vfov: Float,
         aperture: Float,
         samples: u16,
+        focus_dist: Float,
     ) -> Camera {
-        let focus_dist = (&lookfrom - &lookat).norm();
-
         let w = (&lookfrom - &lookat).to_unit();
         let u = vup.cross(&w).to_unit();
         let v = w.cross(&u);
