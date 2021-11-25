@@ -1,142 +1,60 @@
-use crate::sample::*;
-use crate::shape::*;
-use crate::vec::*;
+use rand::random;
 
-use std::f32::consts::PI;
-
-fn tfog(ray: Ray, t: Float) -> Float {
-    ((ray.origin.x + ray.direction.x * t).sin() * (ray.origin.z + ray.direction.z * t).sin()
-        / (ray.origin.y + ray.direction.y * t))
-        .powi(2)
-}
-
-fn fog(point: Vec3) -> Float {
-    (point.x.sin() * point.z.sin() / point.y).powi(2)
-}
-
-fn dfog(point: Vec3, dir: Vec3) -> Float {
-    let ev = point.x.sin() * point.z.sin() / point.y;
-    let grad = Vec3::new(
-        2.0 * ev * point.x.cos(),
-        -2.0 * ev / point.y.powi(2),
-        2.0 * ev * point.z.cos(),
-    );
-
-    grad % dir
-}
-
-fn color(ray: Ray, scene: &HitableGroup) -> Vec3 {
-    let white = Vec3::new(1.0, 1.0, 1.0);
-    let blue = Vec3::new(0.5, 0.7, 1.0);
-    let black = Vec3::new(0.0, 0.0, 0.0);
-
-    let mut color = Vec3::new(1.0, 1.0, 1.0);
-    let mut current_ray = ray;
-    let mut iterations = 0;
-
-    while iterations < 100 && color.norm() > 0.02 {
-        let hit = scene.hit(&current_ray, 0.001, 1_000_000.0);
-        match hit {
-            None => {
-                let direction = current_ray.direction.to_unit();
-                let t = 0.5 * (direction.y + 1.0);
-                color *= (white * (1.0 - t)) + (blue * t);
-                break;
-            }
-            Some(hit) => {
-                let scatter = hit.material.scatter(&current_ray, hit.point, hit.normal);
-                color *= scatter.attenuation;
-                iterations += 1;
-                match scatter.ray {
-                    Some(r) => {
-                        current_ray = r;
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    color
-}
+use crate::{Ray, Vec3};
 
 pub struct Camera {
-    samples: u16,
-    lens_radius: Float,
-    u: Vec3,
-    v: Vec3,
-    nx: Float,
-    ny: Float,
+    width: f32,
+    height: f32,
+    focal_length: f32,
     origin: Vec3,
-    lower_left: Vec3,
+    lower_left_corner: Vec3,
     horizontal: Vec3,
     vertical: Vec3,
 }
 
 impl Camera {
-    pub fn new(
-        lookfrom: Vec3,
-        lookat: Vec3,
-        vup: Vec3,
-        nx: u16,
-        ny: u16,
-        vfov: Float,
-        aperture: Float,
-        samples: u16,
-        focus_dist: Float,
-    ) -> Camera {
+    pub fn new(vfov: f32, aspect_ratio: f32, lookfrom: Vec3, lookat: Vec3) -> Camera {
+        let theta = vfov.to_radians();
+        let h = (theta / 2.0).tan();
+        let height = 2.0 * h;
+        let width = height * aspect_ratio;
+
         let w = (&lookfrom - &lookat).to_unit();
-        let u = vup.cross(&w).to_unit();
+        let u = Vec3::new(0.0, 1.0, 0.0).cross(&w).to_unit();
         let v = w.cross(&u);
 
-        let aspect = nx as Float / ny as Float;
-        let theta = vfov * PI * (1.0 / 180.0);
-        let half_height = (theta / 2.0).tan();
-        let half_width = aspect * half_height;
+        let horizontal = width * u;
+        let vertical = height * v;
+        let lower_left_corner = &lookfrom - &horizontal / 2.0 - &vertical / 2.0 - w;
+
+        let origin = lookfrom;
 
         Camera {
-            samples,
-            lens_radius: aperture / 2.0,
-            nx: nx as Float,
-            ny: ny as Float,
-            lower_left: &lookfrom
-                - (&u * half_width * focus_dist)
-                - (&v * half_height * focus_dist)
-                - (&w * focus_dist),
-            horizontal: 2.0 * half_width * focus_dist * &u,
-            vertical: 2.0 * half_height * focus_dist * &v,
-            origin: lookfrom,
-            u,
-            v,
+            width,
+            height,
+            focal_length: 10.0,
+            origin,
+            horizontal,
+            vertical,
+            lower_left_corner,
         }
     }
 
-    pub fn point(&self, x: u16, y: u16, world: &HitableGroup) -> Vec3 {
-        let mut acc_color = Vec3::new(0.0, 0.0, 0.0);
-        for _ in 1..self.samples {
-            let rd = sample_disk() * self.lens_radius;
-            let offset = &self.u * rd.x + &self.v * rd.y;
-            let u = (x as Float + random()) / self.nx;
-            let v = (y as Float + random()) / self.ny;
-            let ray = Ray::new(
-                &self.origin + &offset,
-                &self.lower_left
-                    + (u * &self.horizontal)
-                    + (v * &self.vertical)
-                    + self.origin.negate()
-                    + offset.negate(),
-            );
-
-            let val = color(ray, world);
-            acc_color += val;
+    pub fn ray(&self, x: usize, y: usize, width: usize, height: usize) -> Vec<Ray> {
+        let mut rays = Vec::new();
+        // TODO configurable samples
+        for _ in 0..500 {
+            let u: f32 = (x as f32 + random::<f32>()) / width as f32;
+            let v: f32 = (y as f32 + random::<f32>()) / height as f32;
+            rays.push(Ray::new(
+                // This clone is because rays will be created
+                // dynamically, and so need to own their origin
+                // vectors.
+                self.origin.clone(),
+                &self.lower_left_corner + u * &self.horizontal + v * &self.vertical - &self.origin,
+            ))
         }
 
-        acc_color / (self.samples as Float)
+        rays
     }
 }
-
-// TODO add tests:
-// - Image render with no light sources (incl backround light)
-//   should be completely dark

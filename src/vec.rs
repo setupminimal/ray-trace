@@ -1,9 +1,11 @@
 use rand::random;
 
+use std::iter::Sum;
 use std::ops;
 use Direction::*;
 
 pub type Float = f32;
+pub type Color = Vec3;
 
 #[derive(Debug, Clone)]
 pub struct Vec3 {
@@ -30,6 +32,33 @@ impl Vec3 {
 
     pub fn random() -> Vec3 {
         Vec3::new(random(), random(), random())
+    }
+
+    pub fn random_in_unit_sphere() -> Vec3 {
+        loop {
+            let v = Vec3::random() * 2.0 - Vec3::new(1.0, 1.0, 1.0);
+            if v.norm() <= 1.0 {
+                return v;
+            }
+        }
+    }
+
+    pub fn random_in_hemisphere(other: Vec3) -> Vec3 {
+        let out = Vec3::random_in_unit_sphere();
+        if out.dot(&other) < 0.0 {
+            -1.0 * out
+        } else {
+            out
+        }
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let s = 0.00000001;
+        return self.x.abs() < s && self.y.abs() < s && self.z.abs() < s;
+    }
+
+    pub fn random_unit_vector() -> Vec3 {
+        Vec3::random_in_unit_sphere().to_unit()
     }
 
     pub fn elem_min(&self, other: &Vec3) -> Vec3 {
@@ -74,6 +103,10 @@ impl Vec3 {
         (self % self).sqrt()
     }
 
+    pub fn length_squared(&self) -> Float {
+        self % self
+    }
+
     pub fn to_unit(&self) -> Vec3 {
         let n = self.norm();
         Vec3 {
@@ -102,12 +135,29 @@ impl Vec3 {
         Vec3 { x: a, y: b, z: c }
     }
 
+    pub fn dot(&self, other: &Vec3) -> Float {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
     pub fn cross(&self, other: &Vec3) -> Vec3 {
         Vec3 {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
             z: self.x * other.y - self.y * other.x,
         }
+    }
+}
+
+impl Sum<Vec3> for Vec3 {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Vec3>,
+    {
+        let mut out = Vec3::new(0.0, 0.0, 0.0);
+        for i in iter {
+            out += i;
+        }
+        out
     }
 }
 
@@ -565,7 +615,6 @@ impl ops::AddAssign<Vec3> for Vec3 {
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
-    pub dir_inv: Vec3,
 }
 
 impl Ray {
@@ -574,27 +623,19 @@ impl Ray {
     }
 
     pub fn new(origin: Vec3, direction: Vec3) -> Ray {
-        Ray {
-            origin,
-            dir_inv: 1.0 / &direction,
-            direction,
-        }
+        Ray { origin, direction }
     }
 }
 
 pub fn reflect(v: &Vec3, normal: &Vec3) -> Vec3 {
-    v - 2.0 * (v % normal) * normal
+    v - 2.0 * v.dot(normal) * normal
 }
 
-pub fn refract(v: &Vec3, normal: &Vec3, nint: Float) -> Option<Vec3> {
-    let uv = v.to_unit();
-    let dt = &uv % normal;
-    let discriminant = 1.0 - nint * nint * (1.0 - dt * dt);
-    if discriminant > 0.0 {
-        Some((nint * (uv - normal * dt)) - (normal * discriminant.powf(0.5)))
-    } else {
-        None
-    }
+pub fn refract(v: &Vec3, normal: &Vec3, etai_over_etat: Float) -> Vec3 {
+    let cos_theta = f32::min(-v.dot(normal), 1.0);
+    let r_out_perp = etai_over_etat * (v + cos_theta * normal);
+    let r_out_parallel = -(1.0 as f32 - r_out_perp.length_squared()).abs().sqrt() * normal;
+    r_out_perp + r_out_parallel
 }
 
 pub fn schlick(cosine: Float, ref_idx: Float) -> Float {

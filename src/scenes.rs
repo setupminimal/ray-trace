@@ -1,128 +1,118 @@
 use rand::random;
 
 use crate::material::Material::*;
-use crate::{Cylinder, Float, HitableGroup, KDTree, Plane, Sphere, Vec3};
+use crate::shapes::*;
+use crate::{Color, Scene, Vec3};
 
-#[allow(dead_code)]
-pub fn pipedream() -> HitableGroup {
-    let mut planes: Vec<Plane> = Vec::new();
-    let mut cylinders: Vec<Cylinder> = Vec::new();
+pub fn one_sphere() -> Scene {
+    let mut s = Scene::empty();
 
-    planes.push(Plane {
-        origin: Vec3::new(0.0, 0.0, 0.0),
-        normal: Vec3::new(1.0, 0.0, 0.0),
-        material: Lambertian(Vec3::new(0.2, 0.2, 0.2)),
-    });
-
-    planes.push(Plane {
-        origin: Vec3::new(60.0 * 60.0 * 2.0, 0.0, 0.0),
-        normal: Vec3::new(1.0, 0.0, 0.0),
-        material: Lambertian(Vec3::new(0.2, 0.2, 0.2)),
-    });
-
-    cylinders.push(Cylinder {
-        radius: 10.0,
-        material: Sun,
-    });
-
-    cylinders.push(Cylinder {
-        radius: 60.0 * 8.0,
-        material: BiasedLambertian(Vec3::new(0.2, 0.7, 0.2)),
-    });
-
-    HitableGroup {
-        planes,
-        spheres: KDTree::new(Vec::new()),
-        cylinders,
-    }
-}
-
-#[allow(dead_code)]
-pub fn plain_scene() -> HitableGroup {
-    let mut things: Vec<Sphere> = Vec::new();
-    let mut planes: Vec<Plane> = Vec::new();
-
-    planes.push(Plane {
-        origin: Vec3::new(0.0, 0.0, 0.0),
-        normal: Vec3::new(0.0, 1.0, 0.0),
-        material: Metal(Vec3::new(0.5, 0.6, 0.75), 0.9),
-    });
-
-    things.push(Sphere {
-        center: Vec3::new(-2.0, 0.0, 0.0),
+    s.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
-        material: Metal(Vec3::new(0.1, 0.1, 0.1), 0.5),
+        mat: Metal(Color::new(0.75, 0.75, 0.75), 0.001),
     });
 
-    HitableGroup {
-        spheres: KDTree::new(things),
-        planes,
-        cylinders: Vec::new(),
-    }
+    s
 }
 
-pub fn random_scene() -> HitableGroup {
-    let mut things: Vec<Sphere> = Vec::new();
-    let mut planes: Vec<Plane> = Vec::new();
+pub fn two_spheres() -> Scene {
+    let mut scene = one_sphere();
+    scene.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+        mat: DiffuseCos(Color::new(0.5, 0.5, 0.5)),
+    });
+    scene
+}
 
-    planes.push(Plane {
-        origin: Vec3::new(0.0, 0.0, 0.0),
-        normal: Vec3::new(0.0, 1.0, 0.0),
-        material: Lambertian(Vec3::new(0.5, 0.5, 0.5)),
+pub fn flanking_mirrors() -> Scene {
+    let mut scene = Scene::empty();
+
+    let ground = DiffuseCos(Color::new(0.8, 0.8, 0.0));
+    let center = Dielectric(Color::new(1.0, 1.0, 1.0), 1.5);
+    //DiffuseCos(Color::new(0.7, 0.3, 0.3));
+    let left = Metal(Color::new(0.8, 0.8, 0.8), 0.1);
+    let right = Metal(Color::new(0.8, 0.6, 0.2), 0.5);
+
+    scene.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+        mat: ground,
     });
 
-    things.push(Sphere {
-        center: Vec3::new(0.0, 1.0, 0.0),
-        radius: 1.0,
-        material: Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.5),
+    scene.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+        mat: center,
     });
 
-    things.push(Sphere {
-        center: Vec3::new(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: Lambertian(Vec3::new(0.4, 0.2, 0.1)),
+    scene.add(Sphere {
+        center: Vec3::new(-1.0, 0.0, -1.0),
+        radius: 0.5,
+        mat: left,
     });
 
-    things.push(Sphere {
-        center: Vec3::new(4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: Metal(Vec3::new(0.7, 0.6, 0.5), 0.0),
+    scene.add(Sphere {
+        center: Vec3::new(1.0, 0.0, -1.0),
+        radius: 0.5,
+        mat: right,
+    });
+
+    scene
+}
+
+pub fn random_scene() -> Scene {
+    let mut scene = Scene::empty();
+
+    scene.add(Sphere {
+        center: Vec3::new(0.0, -1000.0, 0.0),
+        radius: 1000.0,
+        mat: DiffuseCos(Color::new(0.5, 0.5, 0.5)),
     });
 
     for a in -11..11 {
         for b in -11..11 {
-            let choose_mat: f32 = random();
+            let choose_mat = random::<f32>();
             let center = Vec3::new(
-                a as f32 + random::<f32>() * 0.9,
+                a as f32 + 0.9 * random::<f32>(),
                 0.2,
-                b as f32 + random::<f32>() * 0.9,
+                b as f32 + 0.9 * random::<f32>(),
             );
-            let offset = Vec3::new(4.0, 0.2, 0.0);
 
-            if (&center - offset).norm() > 0.9 {
-                things.push(Sphere {
-                    center,
-                    radius: 0.2,
-                    material: if choose_mat < 0.6 {
-                        Lambertian(Vec3::random() * Vec3::random())
-                    } else if choose_mat < 0.95 {
-                        Metal(
-                            Vec3::random() * 0.5 + Vec3::new(0.5, 0.5, 0.5),
-                            random::<f32>() * 0.5,
-                        )
-                    } else {
-                        Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.5)
-                    },
-                });
-            }
+            scene.add(Sphere {
+                center,
+                radius: 0.2,
+                mat: if choose_mat < 0.8 {
+                    let albedo = Color::random() * Color::random();
+                    DiffuseCos(albedo)
+                } else if choose_mat < 0.95 {
+                    let albedo = Color::random() * 0.5 + Color::new(0.5, 0.5, 0.5);
+                    Metal(albedo, random::<f32>() * 0.5)
+                } else {
+                    Dielectric(Color::new(1.0, 1.0, 1.0), 1.5)
+                },
+            });
         }
     }
 
-    let cylinders = Vec::new();
+    scene.add(Sphere {
+        center: Vec3::new(0.0, 1.0, 0.0),
+        radius: 1.0,
+        mat: Dielectric(Vec3::new(1.0, 1.0, 1.0), 1.5),
+    });
 
-    HitableGroup {
-        spheres: KDTree::new(things),
-        planes,
-        cylinders,
-    }
+    scene.add(Sphere {
+        center: Vec3::new(-4.0, 1.0, 0.0),
+        radius: 1.0,
+        mat: DiffuseCos(Vec3::new(0.4, 0.2, 0.1)),
+    });
+
+    scene.add(Sphere {
+        center: Vec3::new(4.0, 1.0, 0.0),
+        radius: 1.0,
+        mat: Metal(Vec3::new(0.7, 0.6, 0.5), 0.0),
+    });
+
+    scene
 }
